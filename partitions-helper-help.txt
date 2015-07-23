@@ -1,0 +1,187 @@
+The Partition Helper
+----------------------
+
+The Partition Helper is a Perl script that makes easy for you to create or modify partitioned tables, especially the ones partitioned by date. You only have to define a range, and the helper creates the partitions for you. The output is a ALTER TABLE statement, which you can eventually pipe to a MySQL command line client or edit for further additions.
+
+Syntax
+----------------------
+   The Partition Helper,  version 1.0.4
+   This program creates a ALTER TABLE statement to add or reorganize
+   partitions for MySQL 5.1 or later
+   (C) 2008-2010 Giuseppe Maxia, Sun Microsystems
+   syntax: ./partitions_helper [options] 
+   -t --table = name                   The table being partitioned
+                                       (no default)
+
+   -c --column = name                  The partitioning column
+                                       (no default)
+
+   -i --interval = name                The interval between partitions
+                                       Accepted: "year", "month", "week",
+                                       "day", or a number
+                                       (default: month) 
+
+   -p --partitions = number            How many partitions to create
+                                       (default: 0) 
+
+   --first_partition = number          the first partition to create
+                                       (default: 1) 
+
+   --reorganize = name                 the partition(s) to reorganize
+                                       (default: none) 
+
+   -s --start = name                   the minimum partitioning value
+                                       (default: 1 for numbers, 
+                                       2001-01-01 for dates) 
+
+   -e --end = name                     The maximum partitioning value
+                                       Used unless --partitions is used
+                                       (no default) 
+
+   -f --function = name                The partitioning function to use in the "range" declaration
+                                       (default: to_days, unless --list is used) 
+
+   -l --list                           Use the COLUMNS feature (versions >= 5.5)
+                                       (default: no) 
+
+   --prefix = name                     prefix for partition name
+                                       (default: p) 
+
+   --explain                           show the current option values
+                                       (default: no) 
+
+   --version                           display the version
+                                       (default: none) 
+
+   -h --help                           display the help page
+                                       (default: no)
+
+
+----------------------
+Examples
+----------------------
+
+
+Numeric ranges
+----------------------
+Create partitions on a numeric column, in steps of 1,000, up to a maximum of 10,000
+./partitions_helper --table=mytable --column=prod_id \
+   --interval=1000 --start=1 --end=10000
+ALTER TABLE mytable 
+PARTITION by range (prod_id)
+(
+  partition p001 VALUES LESS THAN (1000)
+, partition p002 VALUES LESS THAN (2000)
+, partition p003 VALUES LESS THAN (3000)
+, partition p004 VALUES LESS THAN (4000)
+, partition p005 VALUES LESS THAN (5000)
+, partition p006 VALUES LESS THAN (6000)
+, partition p007 VALUES LESS THAN (7000)
+, partition p008 VALUES LESS THAN (8000)
+, partition p009 VALUES LESS THAN (9000)
+, partition p010 VALUES LESS THAN (10000)
+);
+
+Instead of using "--end", you can state how many partitions you want. This command is equivalent to the above one.
+./partitions_helper --table=mytable --column=prod_id \
+   --interval=1000 --start=1 --partitions=10
+The above command can be shortened with the corresponding one-letter options
+./partitions_helper -t mytable -c prod_id -i 1000 -s 1 -p 10
+
+
+Range by year
+----------------------
+
+./partitions_helper --table=mytable --column=d --interval=year \
+    --start=2004-01-01 --end=2009-01-01
+ALTER TABLE mytable 
+PARTITION by range (to_date(d))
+(
+  partition p001 VALUES LESS THAN (to_days('2004-01-01'))
+, partition p002 VALUES LESS THAN (to_days('2005-01-01'))
+, partition p003 VALUES LESS THAN (to_days('2006-01-01'))
+, partition p004 VALUES LESS THAN (to_days('2007-01-01'))
+, partition p005 VALUES LESS THAN (to_days('2008-01-01'))
+, partition p006 VALUES LESS THAN (to_days('2009-01-01'))
+);
+
+
+Partitioning by year is done using to_date instead of year, to allow for further maintenance of the partitions (for example keeping yearly partitions for the old data and monthly partitions for the recent data)
+You can choose to partition with the year function, by using the numeric range interval.
+./partitions_helper --table=mytable --column=d --interval=1 
+ --start=2004 --end=2009 --function=year 
+ALTER TABLE mytable 
+PARTITION by range (year(d))
+(
+  partition p001 VALUES LESS THAN (2004)
+, partition p002 VALUES LESS THAN (2005)
+, partition p003 VALUES LESS THAN (2006)
+, partition p004 VALUES LESS THAN (2007)
+, partition p005 VALUES LESS THAN (2008)
+, partition p006 VALUES LESS THAN (2009)
+);
+
+
+Range by month
+----------------------
+
+Partition by month is what the helper was made for. So this is going to be the easiest case.
+./partitions_helper --table=mytable --column=d --interval=month \
+   --start=2008-01-01 --end=2009-01-01
+ALTER TABLE mytable 
+PARTITION by range (to_date(d))
+(
+  partition p001 VALUES LESS THAN (to_days('2008-01-01'))
+, partition p002 VALUES LESS THAN (to_days('2008-02-01'))
+, partition p003 VALUES LESS THAN (to_days('2008-03-01'))
+, partition p004 VALUES LESS THAN (to_days('2008-04-01'))
+, partition p005 VALUES LESS THAN (to_days('2008-05-01'))
+, partition p006 VALUES LESS THAN (to_days('2008-06-01'))
+, partition p007 VALUES LESS THAN (to_days('2008-07-01'))
+, partition p008 VALUES LESS THAN (to_days('2008-08-01'))
+, partition p009 VALUES LESS THAN (to_days('2008-09-01'))
+, partition p010 VALUES LESS THAN (to_days('2008-10-01'))
+, partition p011 VALUES LESS THAN (to_days('2008-11-01'))
+, partition p012 VALUES LESS THAN (to_days('2008-12-01'))
+, partition p013 VALUES LESS THAN (to_days('2009-01-01'))
+);
+
+
+Explaining the options
+----------------------
+If the result is not what you expected, you can ask the helper to explain the options. Just add "--explain" and the result will be preceded by the list of options that you inserted
+./partitions_helper --table=mytable --column=d --interval=month \
+    --start=2008-01-01 --end=2009-01-01 --explain
+# options              default              value
+# -------------------- -------------------- --------------------
+# table                ()                   mytable
+# column               ()                   d
+# interval             (month)              month
+# partitions           (0)                  13
+# first_partition      (1)                  1
+# reorganize           ()                   
+# start                (2001-01-01)         2008-01-01
+# end                  ()                   2009-01-01
+# function             ()                   to_date
+# list                 (0)                  0
+# prefix               (p)                  p
+# explain              (0)                  1
+# help                 (0)                  0
+# --------------------------------------------------------------
+ALTER TABLE mytable 
+PARTITION by range (to_date(d))
+(
+  partition p001 VALUES LESS THAN (to_days('2008-01-01'))
+, partition p002 VALUES LESS THAN (to_days('2008-02-01'))
+, partition p003 VALUES LESS THAN (to_days('2008-03-01'))
+, partition p004 VALUES LESS THAN (to_days('2008-04-01'))
+, partition p005 VALUES LESS THAN (to_days('2008-05-01'))
+, partition p006 VALUES LESS THAN (to_days('2008-06-01'))
+, partition p007 VALUES LESS THAN (to_days('2008-07-01'))
+, partition p008 VALUES LESS THAN (to_days('2008-08-01'))
+, partition p009 VALUES LESS THAN (to_days('2008-09-01'))
+, partition p010 VALUES LESS THAN (to_days('2008-10-01'))
+, partition p011 VALUES LESS THAN (to_days('2008-11-01'))
+, partition p012 VALUES LESS THAN (to_days('2008-12-01'))
+, partition p013 VALUES LESS THAN (to_days('2009-01-01'))
+);
